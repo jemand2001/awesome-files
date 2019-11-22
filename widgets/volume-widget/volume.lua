@@ -12,6 +12,7 @@ local awful = require("awful")
 local wibox = require("wibox")
 local watch = require("awful.widget.watch")
 local spawn = require("awful.spawn")
+local naughty = require("naughty")
 
 local path_to_icons = "/usr/share/icons/breeze-dark/status/symbolic/"
 
@@ -19,6 +20,7 @@ local GET_VOLUME_CMD = 'amixer -D pulse sget Master'
 local INC_VOLUME_CMD = 'amixer -D pulse sset Master 5%+'
 local DEC_VOLUME_CMD = 'amixer -D pulse sset Master 5%-'
 local TOG_VOLUME_CMD = 'amixer -D pulse sset Master toggle'
+local PAVUCONTRL_CMD = 'pavucontrol'
 
 local volume_widget = wibox.widget {
     {
@@ -55,6 +57,7 @@ volume_widget:connect_signal("button::press", function(_,_,_,button)
     if (button == 4)     then awful.spawn(INC_VOLUME_CMD, false)
     elseif (button == 5) then awful.spawn(DEC_VOLUME_CMD, false)
     elseif (button == 1) then awful.spawn(TOG_VOLUME_CMD, false)
+    elseif (button == 3) then awful.spawn(PAVUCONTRL_CMD, false)
     end
 
     spawn.easy_async(GET_VOLUME_CMD, function(stdout, stderr, exitreason, exitcode)
@@ -63,5 +66,10 @@ volume_widget:connect_signal("button::press", function(_,_,_,button)
 end)
 
 watch(GET_VOLUME_CMD, 1, update_graphic, volume_widget)
-
+-- show this works
+naughty.notify({
+      preset = naughty.config.presets.info,
+      title = "loaded widget",
+      text = "successfully loaded volume.lua"
+})
 return volume_widget

@@ -1,6 +1,7 @@
 local awful = require("awful")
 local watch = require("awful.widget.watch")
 local wibox = require("wibox")
+local naughty = require("naughty")
 
 --- Main ram widget shown on wibar
 local ramgraph_widget = wibox.widget {
@@ -38,8 +39,8 @@ w:setup {
 
 local total, used, free, shared, buff_cache, available, total_swap, used_swap, free_swap
 
-local function getPercentage(value)
-    return math.floor(value / (total+total_swap) * 100 + 0.5) .. '%'
+local function getPercentage(value, the_total)
+    return math.floor(value / the_total * 100 + 0.5) .. '%'
 end
 
 watch('bash -c "free | grep -z Mem.*Swap.*"', 1,
@@ -50,11 +51,19 @@ watch('bash -c "free | grep -z Mem.*Swap.*"', 1,
         widget.data = { used, total-used } widget.data = { used, total-used }
 
         if w.visible then
-            w.pie.data_list = {
-                {'used ' .. getPercentage(used + used_swap), used + used_swap},
-                {'free ' .. getPercentage(free + free_swap), free + free_swap},
-                {'buff_cache ' .. getPercentage(buff_cache), buff_cache}
-            }
+            w.pie.data_list = math.floor(used_swap / total_swap * 100 + 0.5) > 5 and {
+	       {'used ram ' .. getPercentage(used, total), used},-- + used_swap), used + used_swap},
+	       {'used swap ' .. getPercentage(used_swap, total_swap), used_swap},
+	       {'free ram ' .. getPercentage(free, total), free},
+	       {'free swap ' .. getPercentage(free_swap, total_swap), free_swap},
+	       {'buff_cache ' .. getPercentage(buff_cache, total + total_swap), buff_cache}
+	       									}
+	       or
+	       {
+		  {'used ' .. getPercentage(used + used_swap, total + total_swap), used + used_swap},
+		  {'free ' .. getPercentage(free + free_swap, total + total_swap), free + free_swap},
+		  {'buff_cache ' .. getPercentage(buff_cache, total + total_swap), buff_cache}  
+	       }
         end
     end,
     ramgraph_widget
@@ -64,15 +73,30 @@ ramgraph_widget:buttons(
     awful.util.table.join(
         awful.button({}, 1, function()
             awful.placement.top_right(w, { margins = {top = 25, right = 10}, parent = awful.screen.focused() })
-            w.pie.data_list = {
-                {'used ' .. getPercentage(used + used_swap), used + used_swap},
-                {'free ' .. getPercentage(free + free_swap), free + free_swap},
-                {'buff_cache ' .. getPercentage(buff_cache), buff_cache}
-            }
+            w.pie.data_list = math.floor(used_swap / total_swap * 100 + 0.5) > 5 and {
+	       {'used ram ' .. getPercentage(used, total), used},-- + used_swap), used + used_swap},
+	       {'used swap ' .. getPercentage(used_swap, total_swap), used_swap},
+	       {'free ram ' .. getPercentage(free, total), free},
+	       {'free swap ' .. getPercentage(free_swap, total_swap), free_swap},
+	       {'buff_cache ' .. getPercentage(buff_cache, total + total_swap), buff_cache}
+	       									}
+	       or
+	       {
+		  {'used ' .. getPercentage(used + used_swap, total + total_swap), used + used_swap},
+		  {'free ' .. getPercentage(free + free_swap, total + total_swap), free + free_swap},
+		  {'buff_cache ' .. getPercentage(buff_cache, total + total_swap), buff_cache}  
+	       }
             w.pie.display_labels = true
             w.visible = not w.visible
         end)
     )
 )
+
+-- show this works
+naughty.notify({
+      preset = naughty.config.presets.info,
+      title = "loaded widget",
+      text = "successfully loaded ram-widget.lua"
+})
 
 return ramgraph_widget
