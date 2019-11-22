@@ -1,6 +1,7 @@
 -- Standard awesome library
 local gears = require("gears")
 local awful = require("awful")
+local watch = require("awful.widget.watch")
 require("awful.autofocus")
 -- Widget and layout library
 local wibox = require("wibox")
@@ -16,22 +17,10 @@ require("awful.remote")
 -- Load Debian menu entries
 require("debian.menu")
 
--- {{{ Naughty presets
-naughty.config.defaults.timeout = 5
-naughty.config.defaults.screen = 1
-naughty.config.defaults.position = "top_right"
-naughty.config.defaults.margin = 8
-naughty.config.defaults.gap = 1
-naughty.config.defaults.ontop = true
-naughty.config.defaults.font = "terminus 5"
-naughty.config.defaults.icon = nil
-naughty.config.defaults.icon_size = 256
-naughty.config.defaults.fg = beautiful.fg_tooltip
-naughty.config.defaults.bg = beautiful.bg_tooltip
-naughty.config.defaults.border_color = beautiful.border_tooltip
-naughty.config.defaults.border_width = 2
-naughty.config.defaults.hover_timeout = nil
--- }}}
+config_dir = awful.util.get_configuration_dir()
+
+local naughty_defaults = require("notify")
+naughty.config.defaults = naughty_defaults
 
 -- {{{ Error handling
 -- Check if awesome encountered an error during startup and fell back to
@@ -42,11 +31,6 @@ if awesome.startup_errors then
                      text = awesome.startup_errors })
 end
 
--- slight modifications to the critical preset bc that thing's broken normally
--- (way too small)
-local crit = naughty.config.presets.critical
-crit.font = "sans 9"
-
 -- Handle runtime errors after startup
 do
     local in_error = false
@@ -55,7 +39,7 @@ do
         if in_error then return end
         in_error = true
 
-        naughty.notify({ preset = crit,
+        naughty.notify({ preset = naughty.config.presets.critical,
                          title = "Oops, an error happened!",
                          text = tostring(err) })
         in_error = false
@@ -66,14 +50,12 @@ end
 -- {{{ Variable definitions
 -- Themes define colours, icons, font and wallpapers.
 -- beautiful.init(awful.util.get_themes_dir() .. "default/theme.lua")
-beautiful.init("~/.config/awesome/theme.lua")
--- for s = 1, screen.count() do
--- 	gears.wallpaper.maximized(beautiful.wallpaper, s, true)
--- end
-beautiful.wallpaper = awful.util.get_configuration_dir() .. "bg.png"
+-- local theme = require(config_dir.."theme.lua")
+beautiful.init(config_dir .. "theme.lua")
+ beautiful.wallpaper = os.getenv("HOME").."/Pictures/galaxy-wallpaper.jpg"
 
 -- This is used later as the default terminal and editor to run.
-terminal = "x-terminal-emulator"
+terminal = "sakura"-- "x-terminal-emulator"
 editor = os.getenv("EDITOR") or "emacs"
 local function editor_cmd(c)
    awful.spawn(editor .. " " .. c)
@@ -149,8 +131,18 @@ mykeyboardlayout = awful.widget.keyboardlayout()
 
 -- {{{ Wibar
 
+-- separator
+sep = wibox.widget.textbox()
+sep:set_text("|")
+
 -- Create a textclock widget
 mytextclock = wibox.widget.textclock()
+
+-- load external widgets
+ram_widget = require("widgets.ram-widget.ram-widget")
+cpu_widget = require("widgets.cpu-widget.cpu-widget")
+volume_widget = require("widgets.volume-widget.volume")
+-- mines_widget = require("widgets.mines-widget.mines")
 
 -- Create a wibox for each screen and add it
 local taglist_buttons = awful.util.table.join(
@@ -195,6 +187,22 @@ local tasklist_buttons = awful.util.table.join(
                                               awful.client.focus.byidx(-1)
                                           end))
 
+local function put_icons(s)
+   place = require("wibox.container.place")
+   -- load stuff
+   -- local this = require("widgets.desktop-widgets.desktop")
+   -- naughty.notify({
+   -- preset = naughty.config.presets.critical,
+   -- title = "is it a widget tho",
+   -- text = tostring(this.is_widget)
+   -- })
+   -- place {
+   --   this,
+   --   this.width,
+   --   this.height
+   -- }
+end
+
 local function set_wallpaper(s)
     -- Wallpaper
     if beautiful.wallpaper then
@@ -210,16 +218,12 @@ end
 -- Re-set wallpaper when a screen's geometry changes (e.g. different resolution)
 screen.connect_signal("property::geometry", set_wallpaper)
 
--- separator
-sep = wibox.widget.textbox()
-sep:set_text("|")
-
--- load external widgets
-volume_widget = require("widgets.volume-widget.volume")
-
 awful.screen.connect_for_each_screen(function(s)
     -- Wallpaper
     set_wallpaper(s)
+
+    -- icons
+    put_icons()
 
     -- Each screen has its own tag table.
     awful.tag({ "1", "2", "3", "4", "5", "6", "7", "8", "9" }, s, awful.layout.layouts[1])
@@ -257,14 +261,18 @@ awful.screen.connect_for_each_screen(function(s)
             layout = wibox.layout.fixed.horizontal,
             mykeyboardlayout,
             wibox.widget.systray(),
-	    sep,
+	    -- sep,
+	    -- mines_widget,
 	    volume_widget,
-	    sep,
+	    cpu_widget,
+	    ram_widget,
+	    -- sep,
             mytextclock,
             s.mylayoutbox,
         },
     }
 end)
+
 -- }}}
 
 -- {{{ Mouse bindings
@@ -274,6 +282,11 @@ root.buttons(awful.util.table.join(
     awful.button({ }, 5, awful.tag.viewprev)
 ))
 -- }}}
+
+-- autorun function (for consistency)
+local function autorun()
+   awful.spawn.with_shell(os.getenv("HOME") .. "/programme/bin/autorun.sh")
+end
 
 -- {{{ Key bindings
 globalkeys = awful.util.table.join(
@@ -375,11 +388,18 @@ globalkeys = awful.util.table.join(
     awful.key({ modkey }, "p",
        function() menubar.show() end,
        {description = "show the menubar", group = "launcher"}),
-    -- Screenshot
-    awful.key({ }, "Print",
-       function ()
-	  awful.util.spawn("gnome-screenshot >/dev/null", false)
-    end)
+    -- re-run autorun.sh
+    awful.key({ modkey }, "b",
+       autorun,
+       {description = "Re-run autorun.sh", group = "launcher"}),
+    awful.key({ modkey }, "g",
+       function() awful.spawn.with_shell("pgrep picom && killall picom || picom")  end, -- if picom is running, kill it, otherwise start it
+       {description = "toggles picom (may be needed to safely take screenshots from discord)", group = "launcher"})
+    -- -- Screenshot
+    -- awful.key({ }, "Print",
+    --   function ()
+    --     awful.util.spawn("deepin-screenshot >/dev/null", false)
+    --   end)
 )
 
 clientkeys = awful.util.table.join(
@@ -526,18 +546,20 @@ awful.rules.rules = {
 
     -- Add titlebars to normal clients and dialogs
     { rule_any = {type = { "normal", "dialog" }
-      }, properties = { titlebars_enabled = true }
+      }, properties = { titlebars_enabled = false }
     },
 
     -- Set my std programs to their dedicated labels.
      { rule = { class = "Firefox" },
        properties = { screen = 1, tag = "1" } },
-     { rule = { class = "volume_control" },
+     { rule = { class = "discord" },
        properties = { screen = 1, tag = "2" } },
-     { rule = { class = "mines" },
-       properties = { screen = 1, tag = "2" } },
-     { rule = { class = "chromium" },
+     { rule = { class = "Chromium" },
        properties = { screen = 1, tag = "3" } },
+     { rule = { class = "steam" },
+       properties = { screen = 1, tag = "3"} },
+     { rule = { class = "Rocket.Chat" },
+       properties = { screen = 1, tag = "2" } }
 }
 -- }}}
 
@@ -606,9 +628,9 @@ client.connect_signal("mouse::enter", function(c)
     end
 end)
 
--- Autorun
-awful.spawn.with_shell("~/.config/awesome/autorun.sh")
-
 client.connect_signal("focus", function(c) c.border_color = beautiful.border_focus end)
 client.connect_signal("unfocus", function(c) c.border_color = beautiful.border_normal end)
 
+-- Autorun
+autorun()
+--awful.spawn.with_shell(os.getenv("HOME") .. "/programme/bin/autorun.sh")
